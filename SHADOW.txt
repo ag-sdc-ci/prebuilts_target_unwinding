@@ -2,11 +2,14 @@ shadow prebuilt repo: unwinding (libunwindstack no-dex) (target)
   upstream: system/unwinding (android14-release, api 34)
   api-level: 34 payload (branch 34-20261025, rolling 34)
   build: LOCAL makeapex run in ag-build (docker, builder user), recipe
-    apex/unwinding @ ag-ci/system_unwinding sha a1c451e (api-34 fixes for
-    libc++ header ordering, farm procinfo include, phony rustc_demangle
-    archive, link-lib resolution), API=34 LEVEL=v3. Supersedes the
-    published registry pkg v14000001 (api 32), which predates f45d677
-    (VNDK-stub/zstd linking) and a40cfd2 - do not adopt it.
+    apex/unwinding @ ag-ci/system_unwinding sha dd659dc (api-34 fixes for
+    libc++ header ordering, farm procinfo include, link-lib resolution;
+    refresh: real ext-rustc-demangle-capi linked - makedepends
+    ext-rustc-demangle-capi, its staticlib staged where bp2ninja's phony
+    rustc_demangle archive lives and ADDLIBed into the merge, Demangle.cpp
+    stub hunk dropped from the 0001 fallback patch), API=34 LEVEL=v3.
+    Supersedes the published registry pkg v14000001 (api 32), which
+    predates f45d677 (VNDK-stub/zstd linking) and a40cfd2 - do not adopt it.
   blobs: org.blisslabs.ag.ext.unwinding.apex (zero-blob policy: extracted
     payload committed here, blobs not tracked)
   layout: flattened root (payload contents at repo root: Android.bp,
@@ -18,8 +21,16 @@ shadow prebuilt repo: unwinding (libunwindstack no-dex) (target)
     statically - both are LLNDK/VNDK-core, present on device) + libc++.so
     libm.so libdl.so libc.so. libasync_safe is statically linked from the
     ext-core /apex/lib64/libasync_safe.a archive (source: static_libs on
-    bionic) so no DT_NEEDED. libunwindstack_no_dex.a: 33 ELF64 members.
-    include/: 51 headers. Microarch variants libunwindstack-x86_64-v2/-v3.so
+    bionic) so no DT_NEEDED. libunwindstack_no_dex.a: 107 ELF64 members -
+    34 unwindstack objects + the REAL librustc_demangle_static from
+    ext-rustc-demangle-capi (payload .a sha256 fea7adc1d7594353d5e189ac6
+    1c2a76043ce556bdf48265e0cefe0a5138e91ec, capi 67079d70 / dep
+    rustc-demangle e6936bf, rustc 1.75.0 staticlib panic=abort pic),
+    MRI-ADDLIBed per the source whole_static_libs contract; nm shows
+    T rustc_demangle (4-arg C API) and Demangle.o has a genuine
+    U rustc_demangle reference (the former header-only shim is gone).
+    libunwindstack.so exports rustc_demangle (whole-static merge, same as
+    AOSP source). include/: 51 headers. Microarch variants libunwindstack-x86_64-v2/-v3.so
     kept in lib/ untracked by Android.bp (LEVEL=v3 build).
   modules: libunwindstack (cc_prebuilt_library_shared), libunwindstack_no_dex
     (cc_prebuilt_library_static), libunwindstack_static (alias, stem
@@ -45,8 +56,7 @@ shadow prebuilt repo: unwinding (libunwindstack no-dex) (target)
     rely on non-AOSP symbols. (2) DEXFILE_SUPPORT is stripped (recipe builds
     libunwindstack_no_dex with -UDEXFILE_SUPPORT): NO dex frame support -
     consumers needing dex frames would need libdexfile, out of scope per
-    dalvik D3. (3) rustc_demangle shim is header-only (fallback patch):
-    rust symbol demangling degrades to __cxa_demangle. (4)
+    dalvik D3. (3)
     native_bridge_supported is not representable on a prebuilt (fleet
     precedent); VNDK v30-v33 snapshots coexist via vndk_prebuilt_shared
     same-name precedent (prebuilts/vndk/v3*).
