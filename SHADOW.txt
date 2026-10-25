@@ -1,0 +1,53 @@
+shadow prebuilt repo: unwinding (libunwindstack no-dex) (target)
+  upstream: system/unwinding (android14-release, api 34)
+  api-level: 34 payload (branch 34-20261025, rolling 34)
+  build: LOCAL makeapex run in ag-build (docker, builder user), recipe
+    apex/unwinding @ ag-ci/system_unwinding sha a1c451e (api-34 fixes for
+    libc++ header ordering, farm procinfo include, phony rustc_demangle
+    archive, link-lib resolution), API=34 LEVEL=v3. Supersedes the
+    published registry pkg v14000001 (api 32), which predates f45d677
+    (VNDK-stub/zstd linking) and a40cfd2 - do not adopt it.
+  blobs: org.blisslabs.ag.ext.unwinding.apex (zero-blob policy: extracted
+    payload committed here, blobs not tracked)
+  layout: flattened root (payload contents at repo root: Android.bp,
+    LICENSE_BSD, include/, lib/)
+  payload verification: libunwindstack.so is a real ELF64 x86-64 bionic DYN,
+    SONAME libunwindstack.so; DT_NEEDED libbase.so liblog.so liblzma.so
+    (source shared_libs) + libz.so libprocinfo.so (recorded by lld from the
+    recipe link line although no object references them; source links both
+    statically - both are LLNDK/VNDK-core, present on device) + libc++.so
+    libm.so libdl.so libc.so. libasync_safe is statically linked from the
+    ext-core /apex/lib64/libasync_safe.a archive (source: static_libs on
+    bionic) so no DT_NEEDED. libunwindstack_no_dex.a: 33 ELF64 members.
+    include/: 51 headers. Microarch variants libunwindstack-x86_64-v2/-v3.so
+    kept in lib/ untracked by Android.bp (LEVEL=v3 build).
+  modules: libunwindstack (cc_prebuilt_library_shared), libunwindstack_no_dex
+    (cc_prebuilt_library_static), libunwindstack_static (alias, stem
+    libunwindstack), libunwindstack_headers. Flags hand-aligned to source:
+    ramdisk/vendor/product/recovery/vendor_ramdisk_available, vndk{enabled,
+    support_system_process}, apex_available platform+com.android.art(+debug)
+    +com.android.runtime, min_sdk_version 29; no_dex visibility mirrored
+    (gwp_asan, debuggerd, init, libutils, libbacktrace).
+  dropped vs source: libunwindstack_utils, libunwindstack_stdout_log,
+    unwind/unwind_info/unwind_symbols/unwind_for_offline/unwind_reg_info,
+    unwind_benchmarks, gen_gnudebugdata, unit tests, fuzz targets, and the
+    libunwindstack_flags / libunwindstack_fuzz_defaults / libunwindstack_tools
+    cc_defaults. libunwindstack_local/testlib test-only modules dropped.
+  consumers: only libEGL (frameworks/native/opengl/libs) binds
+    libunwindstack via shared_libs in the framework-only tree outside
+    tests/tools. NOTE: art/runtime (libart) and art/sigchainlib also bind
+    shared libunwindstack in los-21 (source art modules) - they resolve via
+    this same prebuilt. Nothing outside system/unwinding binds
+    libunwindstack_no_dex.
+  caveats: (1) the .so is hand-linked by the recipe (NDK clang++
+    -whole-archive) and OMITS the source exported_x86.map version script -
+    the exported symbol surface may be wider than AOSP; consumers must not
+    rely on non-AOSP symbols. (2) DEXFILE_SUPPORT is stripped (recipe builds
+    libunwindstack_no_dex with -UDEXFILE_SUPPORT): NO dex frame support -
+    consumers needing dex frames would need libdexfile, out of scope per
+    dalvik D3. (3) rustc_demangle shim is header-only (fallback patch):
+    rust symbol demangling degrades to __cxa_demangle. (4)
+    native_bridge_supported is not representable on a prebuilt (fleet
+    precedent); VNDK v30-v33 snapshots coexist via vndk_prebuilt_shared
+    same-name precedent (prebuilts/vndk/v3*).
+  date: 2026-10-25
